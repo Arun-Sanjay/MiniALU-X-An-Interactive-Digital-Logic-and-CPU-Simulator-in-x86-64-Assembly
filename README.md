@@ -5,6 +5,10 @@ MiniALU-X is an educational, terminal-based simulator written entirely in **x86-
 
 It bridges the gap between **digital logic theory** and **real processor behavior** by exposing registers, control words, carry propagation, and status flags at the lowest level.
 
+## 👀 Preview
+![djnf](https://github.com/user-attachments/assets/a6d3bcbd-df47-48f5-8367-a02b8409bb29)
+
+
 ---
 
 ## ✨ Key Features
