@@ -29,11 +29,6 @@ _start:
     cmp     al, 'f'
     je      .op_fa
 
-    cmp     al, 'G'               ; Gate-level full adder breakdown
-    je      .op_fa_gate
-    cmp     al, 'g'
-    je      .op_fa_gate
-
     cmp     al, 'R'               ; 4-bit ripple carry adder
     je      .op_rca4
     cmp     al, 'r'
@@ -52,10 +47,6 @@ _start:
     ; Backward-compat keys (not shown)
     cmp     al, '0'
     je      .op_fa
-    cmp     al, 'A'
-    je      .op_fa_gate
-    cmp     al, 'a'
-    je      .op_fa_gate
     cmp     al, 'B'
     je      .op_rca4
     cmp     al, 'b'
@@ -89,118 +80,6 @@ _start:
     mov     edx, invalid_txt_len
     call    write_stdout
     jmp     .menu
-; ---- Full Adder Gate-Level Breakdown ----
-.op_fa_gate:
-    lea     rsi, [rel title_fa_gate]
-    mov     edx, title_fa_gate_len
-    call    write_stdout
-
-    ; Read A, B, Cin (0/1)
-    lea     rsi, [rel prompt_fa_a]
-    mov     edx, prompt_fa_a_len
-    call    write_stdout
-    call    read_line
-    lea     rsi, [rel inbuf]
-    call    parse_u32
-    and     eax, 1
-    mov     ebx, eax              ; A
-
-    lea     rsi, [rel prompt_fa_b]
-    mov     edx, prompt_fa_b_len
-    call    write_stdout
-    call    read_line
-    lea     rsi, [rel inbuf]
-    call    parse_u32
-    and     eax, 1
-    mov     r10d, eax             ; B
-
-    lea     rsi, [rel prompt_fa_c]
-    mov     edx, prompt_fa_c_len
-    call    write_stdout
-    call    read_line
-    lea     rsi, [rel inbuf]
-    call    parse_u32
-    and     eax, 1
-    mov     r13d, eax             ; Cin
-
-    lea     rsi, [rel header_fa_gate]
-    mov     edx, header_fa_gate_len
-    call    write_stdout
-
-    ; X = A xor B
-    mov     eax, ebx
-    xor     eax, r10d
-    mov     r14d, eax             ; X
-
-    ; AB = A & B
-    mov     eax, ebx
-    and     eax, r10d
-    mov     r15d, eax             ; AB
-
-    ; CinX = Cin & X
-    mov     eax, r13d
-    and     eax, r14d
-    mov     r12d, eax             ; CinX
-
-    ; Sum = X xor Cin
-    mov     eax, r14d
-    xor     eax, r13d
-
-    ; Cout = AB | CinX
-    mov     eax, r15d
-    or      eax, r12d
-
-    ; Print: A B Cin | X AB CinX | Sum Cout
-    mov     eax, ebx
-    call    print_u32
-    call    print_sp
-
-    ; FIX: use stored B to avoid clobbered r10 across syscalls
-    mov     eax, dword [rel B4_TMP]
-    call    print_u32
-    call    print_sp
-
-    mov     eax, r13d
-    call    print_u32
-
-    lea     rsi, [rel sep_fa]
-    mov     edx, sep_fa_len
-    call    write_stdout
-
-    mov     eax, r14d             ; X
-    call    print_u32
-    call    print_sp
-
-    mov     eax, r15d             ; AB
-    call    print_u32
-    call    print_sp
-
-    mov     eax, r12d             ; CinX
-    call    print_u32
-
-    lea     rsi, [rel sep_gate]
-    mov     edx, sep_gate_len
-    call    write_stdout
-
-    ; Sum = X xor Cin (recompute right before printing)
-    mov     eax, r14d
-    xor     eax, r13d
-    call    print_u32
-    call    print_sp
-
-    ; Cout = AB | CinX (recompute right before printing)
-    mov     eax, r15d
-    or      eax, r12d
-    call    print_u32
-    call    print_nl
-
-    lea     rsi, [rel eq_fa]
-    mov     edx, eq_fa_len
-    call    write_stdout
-
-    call    wait_enter
-    jmp     .menu
-
 ; ---- Mini ALU System (Registers + Control Word) ----
 .op_mini:
     lea     rsi, [rel mini_title]
@@ -309,8 +188,18 @@ _start:
     call    read_line
     lea     rsi, [rel inbuf]
     call    parse_u32
-    and     eax, 7
+    ; UI uses 1..8 to match main menu. Convert to internal 0..7.
+    cmp     eax, 1
+    jb      .mini_op_bad
+    cmp     eax, 8
+    ja      .mini_op_bad
+    dec     eax
     mov     byte [rel M_OP], al
+    jmp     .mini_op_ok
+.mini_op_bad:
+    xor     eax, eax              ; default ADD if invalid
+    mov     byte [rel M_OP], al
+.mini_op_ok:
 
     lea     rsi, [rel prompt_dest]
     mov     edx, prompt_dest_len
@@ -355,6 +244,7 @@ _start:
     mov     edx, op_lbl_len
     call    write_stdout
     movzx   eax, byte [rel M_OP]
+    inc     eax
     call    print_u32
     call    print_sp
 
@@ -1700,11 +1590,11 @@ mini_exec_core:
     cmp     ecx, 4
     je      .mec_xor
     cmp     ecx, 5
-    je      .mec_not
-    cmp     ecx, 6
     je      .mec_shl
-    cmp     ecx, 7
+    cmp     ecx, 6
     je      .mec_shr
+    cmp     ecx, 7
+    je      .mec_cmp
     jmp     .mec_flags
 
 .mec_add:
@@ -1773,12 +1663,6 @@ mini_exec_core:
     mov     byte [rel M_OUT], al
     jmp     .mec_flags
 
-.mec_not:
-    movzx   eax, byte [rel M_A]
-    xor     eax, 0xFF
-    mov     byte [rel M_OUT], al
-    jmp     .mec_flags
-
 .mec_shl:
     mov     al, byte [rel M_A]
     shl     al, 1
@@ -1795,6 +1679,29 @@ mini_exec_core:
     setc    r11b
     mov     byte [rel M_FLAG_C], r11b
     mov     byte [rel M_OUT], al
+    jmp     .mec_flags
+
+.mec_cmp:
+    ; CMP: conceptually A - B, update flags. OUT holds the subtraction result.
+    movzx   eax, byte [rel M_A]
+    movzx   ebx, byte [rel M_B]
+    sub     eax, ebx
+    setb    r11b                  ; borrow for unsigned compare
+    mov     byte [rel M_FLAG_C], r11b
+    mov     byte [rel M_OUT], al
+
+    ; Overflow for subtraction: (A ^ B) & (A ^ OUT) has MSB set
+    movzx   ecx, byte [rel M_A]
+    movzx   edx, byte [rel M_B]
+    movzx   edi, byte [rel M_OUT]
+    mov     eax, ecx
+    xor     eax, edx              ; A ^ B
+    mov     ebx, ecx
+    xor     ebx, edi              ; A ^ OUT
+    and     eax, ebx
+    and     eax, 0x80
+    setnz   r11b
+    mov     byte [rel M_FLAG_V], r11b
     jmp     .mec_flags
 
 .mec_flags:
@@ -2250,7 +2157,6 @@ menu_txt:
 
     db 0x1b,"[33m","[Digital Logic]",0x1b,"[0m",10
     db "F) Full Adder truth table (A,B,Cin -> Sum,Cout)",10
-    db "G) Full Adder gate-level signals (X, AB, CinX)",10
     db "R) 4-bit Ripple Carry Adder (A[3:0] + B[3:0] + Cin)",10
     db "T) Logic-gates truth table (AND/OR/XOR/NAND/NOR)",10
     db "M) Mini ALU System (Registers + Control Word)",10
@@ -2392,7 +2298,7 @@ prompt_src1 db "SRC1 (0..3): "
 prompt_src1_len equ $-prompt_src1
 prompt_src2 db "SRC2 (0..3): "
 prompt_src2_len equ $-prompt_src2
-prompt_op db "OP (0..7): "
+prompt_op db "OP (1..8): "
 prompt_op_len equ $-prompt_op
 prompt_dest db "DEST (0..3): "
 prompt_dest_len equ $-prompt_dest
@@ -2446,20 +2352,8 @@ r3_lbl_len equ $-r3_lbl
 hex_prefix db "0x"
 hex_prefix_len equ $-hex_prefix
 
-title_fa_gate db 10,"--- Full Adder Gate-Level Breakdown ---",10
-title_fa_gate_len equ $-title_fa_gate
-
 title_rca4 db 10,"--- 4-bit Ripple Carry Adder ---",10
 title_rca4_len equ $-title_rca4
-
-header_fa_gate db "A B Cin | X AB CinX | Sum Cout",10
-header_fa_gate_len equ $-header_fa_gate
-
-sep_gate db "  | "
-sep_gate_len equ $-sep_gate
-
-eq_fa db 10,"Equations: X=A XOR B, Sum=X XOR Cin, Cout=(A&B) OR (Cin&X)",10
-eq_fa_len equ $-eq_fa
 
 prompt_a4 db "Enter A (0..15): "
 prompt_a4_len equ $-prompt_a4
