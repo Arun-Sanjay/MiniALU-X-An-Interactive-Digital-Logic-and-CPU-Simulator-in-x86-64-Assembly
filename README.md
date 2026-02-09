@@ -8,7 +8,6 @@ It bridges the gap between **digital logic theory** and **real processor behavio
 ## 👀 Preview
 ![djnf](https://github.com/user-attachments/assets/a6d3bcbd-df47-48f5-8367-a02b8409bb29)
 
-
 ---
 
 ## ✨ Key Features
@@ -16,7 +15,6 @@ It bridges the gap between **digital logic theory** and **real processor behavio
 ### 🔹 Digital Logic
 - **1-bit Full Adder**
   - Truth table generation
-  - Gate-level signal breakdown (`X`, `A·B`, `Cin·X`)
 - **4-bit Ripple Carry Adder**
   - Stage-by-stage carry propagation
   - Carry chain visualization (`C0 → C4`)
@@ -74,7 +72,7 @@ This makes it especially useful for:
 
 ## 🖥️ Platform & Requirements
 
-- **OS:** macOS (x86-64)
+- **OS:** macOS (x86-64 binaries, supported on Apple Silicon via Rosetta 2)
 - **Assembler:** NASM
 - **Linker:** `ld64.lld` or system `ld`
 - **Terminal:** ANSI-compatible
@@ -100,7 +98,6 @@ ld64.lld -arch x86_64 alu.o -o alu \
 ```
 [Digital Logic]
 F) Full Adder truth table
-G) Full Adder gate-level signals
 R) 4-bit Ripple Carry Adder
 T) Logic-gates truth table
 M) Mini ALU System
@@ -146,8 +143,8 @@ Sum = 0101 (5)
 ## 📦 Project Structure
 
 ```
-sched.asm      → Entire ALU + CPU implementation
-README.md      → Documentation
+sched.asm      → Complete ALU + Mini CPU implementation (NASM)
+README.md      → Project documentation
 ```
 
 (All logic is implemented in a **single assembly source file** for clarity and traceability.)
